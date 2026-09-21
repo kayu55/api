@@ -77,15 +77,15 @@ setup_bot() {
     if [ ! -f /usr/bin/api-xwan/api.js ]; then
         echo -e "${blue}📁 Downloading API-XWAN package...${neutral}"
         apt install p7zip-full -y
-        curl -sL "https://raw.githubusercontent.com/kayu55/api/main/api/api-xwan.zip" -o /usr/local/bin/api-xwan.zip
-        cd /usr/local/bin && 7z x -punlock api-xwan.zip
+        curl -sL "https://raw.githubusercontent.com/kayu55/api/main/api/api-xwan.zip" -o /usr/local/sbin/api-xwan.zip
+        cd /usr/local/sbin && 7z x -punlock api-xwan.zip
         rm api-xwan.zip* && chmod +x api-xwan/* && cd
     fi
 
     # === Install Dependencies ===
-    npm list --prefix /usr/local/bin/api-xwan express child_process >/dev/null 2>&1 || {
+    npm list --prefix /usr/local/sbin/api-xwan express child_process >/dev/null 2>&1 || {
         echo -e "${yellow}📦 Installing dependencies...${neutral}"
-        npm install --prefix /usr/local/bin/api-xwan express child_process
+        npm install --prefix /usr/local/sbin/api-xwan express child_process
     }
 
     # === Generate AUTH_KEY ===
