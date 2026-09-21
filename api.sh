@@ -78,7 +78,7 @@ setup_bot() {
         echo -e "${blue}📁 Downloading API-XWAN package...${neutral}"
         apt install p7zip-full -y
         apt install p7zip -y
-        curl -sL "https://raw.githubusercontent.com/kayu55/api/main/api/api-xwan.zip" -o /usr/bin/api-xwan.zip
+        curl -O "https://raw.githubusercontent.com/kayu55/api/main/api/api-xwan.zip" -o /usr/bin/api-xwan.zip
         cd /usr/bin && p7zip api-xwan.zip >/dev/null 2>&1
         rm api-xwan.zip* && chmod +x api-xwan/* && cd
     fi
