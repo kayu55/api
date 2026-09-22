@@ -74,8 +74,17 @@ setup_bot() {
     chmod +x /root/BotVPN2/*
 }
 
-
 server_app() {
+    clear
+
+    
+        read -p "Masukkan NAMA PROJEK PAKASIR: " PRJ
+    while [ -z "$PRJ" ]; do read -p "Masukkan Link Topup: " PRJ; done
+    
+    
+
+    # Simpan konfigurasi ke file .vars.json
+
 
     # Deteksi lokasi node secara otomatis
     NODE_PATH=$(which node)
@@ -122,7 +131,7 @@ EOF
 
     echo -e "Status Server: $(systemctl is-active sellvpn)"
     echo -e "${green}Bot berhasil diinstal dan sedang berjalan.${neutral}"
-
+}
 
 if [[ $1 == "sellvpn" ]]; then
     hapus_bot_lama
