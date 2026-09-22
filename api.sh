@@ -15,7 +15,7 @@ reset="\e[0m"
 
 # === Banner / Header ===
 print_header() {
-    echo -e "${green}⛓️  D£VSX-NETWORK v12.0.3 :: [Ω-Protocol]${neutral}"
+    echo -e "${green}⛓️  INSTALL API GUYS [Ω-Protocol]${neutral}"
     echo -e "${blue}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${neutral}"
     echo -e "   ⚙️  ${bold_white}Secure${neutral} | ${green}Fast${neutral} | ${purple}Adaptive${neutral} | ${yellow}Next-Gen${neutral}"
     echo -e "${blue}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${neutral}\n"
@@ -59,7 +59,7 @@ cek_status() {
 # === Setup Bot ===
 setup_bot() {
     print_header
-    print_rainbow "🚀 Initializing API-XWAN Setup..."
+    print_rainbow "🚀 Initializing API Setup..."
 
     NODE_VERSION=$(node -v 2>/dev/null | grep -oP '(?<=v)\d+' || echo "0")
     rm -f /var/lib/dpkg/stato* /var/lib/dpkg/lock*
@@ -75,7 +75,7 @@ setup_bot() {
 
     # === Extract API Files ===
     if [ ! -f /usr/bin/api-xwan/api.js ]; then
-        echo -e "${blue}📁 Downloading API-XWAN package...${neutral}"
+        echo -e "${blue}📁 Downloading API package...${neutral}"
         apt install p7zip-full -y
         apt install p7zip -y
         curl -O "https://raw.githubusercontent.com/kayu55/api/main/api/api-xwan.zip" -o /usr/bin/api-xwan.zip
@@ -110,7 +110,7 @@ setup_bot() {
     grep -q "botapi.conf" /etc/profile || echo "source /etc/botapi.conf" >> /etc/profile
     source /etc/botapi.conf
 
-    MESSAGE="🚀 *api-xwan Installed Successfully* 🚀
+    MESSAGE="🚀 *API-BESAR Installed Successfully* 🚀
 🔑 *Auth Key:* \`$AUTH_KEY\`
 🌐 *Server IP:* \`$SERVER_IP\`
 🌍 *Domain:* \`$DOMAIN\`"
