@@ -76,14 +76,18 @@ setup_bot() {
 
 server_app() {
     clear
+    echo -e "${orange}─────────────────────────────────────────${neutral}"
+    echo -e "${green}- BOT SELLVPN TELEGRAM MOD BY LITE & XWAN${neutral}"
+    echo -e "${orange}─────────────────────────────────────────${neutral}"
 
-    
-        read -p "Masukkan NAMA PROJEK PAKASIR: " PRJ
-    while [ -z "$PRJ" ]; do read -p "Masukkan Link Topup: " PRJ; done
-    
-    
+    read -p "Masukkan token bot: " token
+    while [ -z "$token" ]; do read -p "Masukkan token bot: " token; done
 
-    # Simpan konfigurasi ke file .vars.json
+    read -p "Masukkan admin ID: " adminid
+    while [ -z "$adminid" ]; do read -p "Masukkan admin ID: " adminid; done
+
+    read -p "Masukkan nama store: " namastore
+    while [ -z "$namastore" ]; do read -p "Masukkan nama store: " namastore; done
 
 
     # Deteksi lokasi node secara otomatis
