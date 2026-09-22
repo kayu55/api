@@ -75,6 +75,7 @@ setup_bot() {
 }
 
 
+server_app() {
 
     # Deteksi lokasi node secara otomatis
     NODE_PATH=$(which node)
