@@ -121,7 +121,7 @@ EOF
 
     echo -e "Status Server: $(systemctl is-active sellvpn)"
     echo -e "${green}Bot berhasil diinstal dan sedang berjalan.${neutral}"
-}
+
 
 if [[ $1 == "sellvpn" ]]; then
     hapus_bot_lama
