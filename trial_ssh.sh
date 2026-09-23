@@ -7,7 +7,7 @@ if ! command -v at &> /dev/null; then
 fi
 
 user="${1:-Trial}"
-Pass="${2:-orderyuk}"
+Pass="${2:-beliyank}"
 iplimit="${3:-1}"
 masaaktif="${4:-1}"
 pup="30"
