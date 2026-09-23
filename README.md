@@ -6,5 +6,5 @@ apt install dos2unix -y && wget https://raw.githubusercontent.com/kayu55/api/mai
 
 
 ````
-wget -O trial_ssh "raw.githubusercontent.com/kayu55/api/main/trial_ssh.sh" && chmod +x trial_ssh
+wget -O trialssh "raw.githubusercontent.com/kayu55/api/main/trialssh.sh" && chmod +x trialssh
 ````
