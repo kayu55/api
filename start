@@ -1,0 +1,228 @@
+#!/bin/bash
+# Colors
+green="\e[38;5;82m"
+red="\e[38;5;196m"
+neutral="\e[0m"
+orange="\e[38;5;130m"
+blue="\e[38;5;39m"
+yellow="\e[38;5;226m"
+purple="\e[38;5;141m"
+bold_white="\e[1;37m"
+reset="\e[0m"
+pink="\e[38;5;205m"
+
+hapus_bot_lama() {
+    echo -e "${orange}Menghapus bot lama...${neutral}"
+    systemctl stop sellvpn.service 2>/dev/null
+    systemctl disable sellvpn.service 2>/dev/null
+    rm -f /etc/systemd/system/sellvpn.service
+    rm -f /usr/bin/sellvpn /usr/bin/server_sellvpn /etc/cron.d/server_sellvpn
+    rm -rf /root/BotVPN2
+
+    if command -v pm2 &> /dev/null; then
+        pm2 delete sellvpn &> /dev/null
+        pm2 save &> /dev/null
+    fi
+
+    systemctl daemon-reload
+    echo -e "${green}Bot lama berhasil dihapus.${neutral}"
+}
+
+pasang_package() {
+    echo -e "${blue}Memulai pengecekan dan instalasi dependensi...${reset}"
+
+    # Install Node.js v20 (stabil untuk Debian 10+/Ubuntu 20+)
+    if ! command -v node >/dev/null 2>&1 || ! node -v | grep -q 'v20'; then
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+        apt-get install -y nodejs
+    fi
+
+    # Downgrade npm ke versi 10 agar kompatibel
+    npm install -g npm@10
+
+    # Install dependencies APT
+    apt update
+    apt install -y build-essential libcairo2-dev libpango1.0-dev \
+        libjpeg-dev libgif-dev librsvg2-dev pkg-config libpixman-1-dev git curl cron
+}
+
+setup_bot() {
+    timedatectl set-timezone Asia/Jakarta
+
+    # Clone Bot
+    if [ ! -d /root/BotVPN2 ]; then
+        git clone https://github.com/kayu55/BotVPN2.git /root/BotVPN2
+    fi
+
+    # Install dependencies
+    cd /root/BotVPN2
+    mkdir -p assets
+    rm -rf app.js
+    wget https://raw.githubusercontent.com/kayu55/api/main/app.js
+    cd assets
+    wget https://raw.githubusercontent.com/kayu55/boot/main/botvpn/qris.png
+    wget https://raw.githubusercontent.com/kayu55/boot/main/botvpn/topup_success.png
+    cd 
+    cd /root/BotVPN2
+    npm install sqlite3 express crypto telegraf axios dotenv canvas node-fetch form-data
+    npm rebuild canvas
+    rm -rf node_modules
+    npm install
+    npm uninstall node-fetch
+    npm install node-fetch@2
+    npm install qrcode sharp
+    chmod +x /root/BotVPN2/*
+}
+
+server_app() {
+    clear
+    echo -e "${orange}─────────────────────────────────────────${neutral}"
+    echo -e "${green}- BOT SELLVPN TELEGRAM MOD BY LITE ETIL ${neutral}"
+    echo -e "${orange}─────────────────────────────────────────${neutral}"
+
+    read -p "Masukkan token bot: " token
+    while [ -z "$token" ]; do read -p "Masukkan token bot: " token; done
+
+    read -p "Masukkan admin ID: " adminid
+    while [ -z "$adminid" ]; do read -p "Masukkan admin ID: " adminid; done
+
+    read -p "Masukkan nama store: " namastore
+    while [ -z "$namastore" ]; do read -p "Masukkan nama store: " namastore; done
+
+    read -p "Masukkan DATA QRIS: " dataqris
+    while [ -z "$dataqris" ]; do read -p "Masukkan DATA QRIS: " dataqris; done
+
+    read -p "Masukkan MERCHANT ID: " merchantid
+    while [ -z "$merchantid" ]; do read -p "Masukkan MERCHANT ID: " merchantid; done
+
+    read -p "Masukkan API KEY: " apikey
+    while [ -z "$apikey" ]; do read -p "Masukkan API KEY: " apikey; done
+    
+    read -p "Masukkan Chat ID Group Telegram: " chatid_group
+    while [ -z "$apikey" ]; do read -p "Masukkan API KEY: " chatid_group; done
+    
+    read -p "Masukkan Username Saweria: " username_saweria
+    while [ -z "$apikey" ]; do read -p "Masukkan API KEY: " username_saweria; done
+    
+    read -p "Masukkan Email Saweria: " saweria_email
+    while [ -z "$apikey" ]; do read -p "Masukkan API KEY: " saweria_email; done
+    
+    read -p "Masukkan Username Grup ( aryablitar77 ): " username_grup
+    while [ -z "$username_grup" ]; do read -p "Masukkan USERNAME GRUP: " username_grup; done
+    
+    read -p "Masukkan Username channel ( pusatevpn ): " username_channel
+    while [ -z "$username_channel" ]; do read -p "Masukkan USERNAME CHANNEL: " username_channel; done
+    
+    read -p "Masukkan Nomor Wa ( 62xxxxx ) : " nomor_wa
+    while [ -z "$nomor_wa" ]; do read -p "Masukkan NOMOR WA: " nomor_wa; done
+    
+    read -p "Masukkan AUTH Token Bot  dari @orderkuota_api_bot  : " authx
+    while [ -z "$authx" ]; do read -p "Masukkan TOKEN BOT: " authx; done
+    
+    read -p "Masukkan MERCHANT ID GOPAY: " gopay_id
+    while [ -z "$gopay_id" ]; do read -p "Masukkan MERCHANT ID GOPAY: " gopay_id; done
+    
+    read -p "Masukkan GOPAY KEY/GOPAY API: " gopay_key
+    while [ -z "$gopay_key" ]; do read -p "Masukkan MERCHANT ID: " gopay_key; done
+    
+    read -p "Masukkan DATA QRIS GOPAY: " dataqrisgopay
+    while [ -z "$dataqrisgopay" ]; do read -p "Masukkan DATA QRIS GOPAY: " dataqrisgopay; done
+    
+    read -p "Masukkan Link Gambar Menu (https://kamu.web.id/menu.jpg: " gambar_menu
+    while [ -z "$gambar_menu" ]; do read -p "Masukkan Link Menu: " gambar_menu; done
+    
+    read -p "Masukkan Link Gambar Topup (https://kamu.web.id/topup.jpg: " gambar_topup
+    while [ -z "$gambar_topup" ]; do read -p "Masukkan Link Topup: " gambar_topup; done
+    
+        read -p "Masukkan API PAKASIR: " API_SIR
+    while [ -z "$API_SIR" ]; do read -p "Masukkan Link Topup: " API_SIR; done
+    
+        read -p "Masukkan NAMA PROJEK PAKASIR: " PRJ
+    while [ -z "$PRJ" ]; do read -p "Masukkan Link Topup: " PRJ; done
+    
+    
+
+    # Simpan konfigurasi ke file .vars.json
+    cat >/root/BotVPN2/.vars.json <<EOF
+{
+  "BOT_TOKEN": "$token",
+  "USER_ID": "$adminid,1210833546",
+  "NAMA_STORE": "$namastore",
+  "PORT": "50123",
+  "DATA_QRIS": "$dataqris",
+  "MERCHANT_ID": "$merchantid",
+  "API_KEY": "$apikey",
+  "GROUP_CHAT_ID": "$chatid_group",
+  "SAWERIA_USERNAME": "username_saweria",
+  "SAWERIA_EMAIL": "$saweria_email",
+  "ADMIN_WA": "$nomor_wa",
+  "AUTHX": "$authx",
+  "GOPAY_ID": "$gopay_id",
+  "GOPAY_KEY": "$gopay_key",
+  "DATA_QRIS_GOPAY": "$dataqrisgopay",
+  "AUTH_PAYMET_GETWAY": "AriPaymentGatewayVersion2026",
+  "GROUP_USERNAME": "$username_grup",
+  "CHANNEL_USERNAME": "$username_channel",
+  "GAMBAR_MENU": "$gambar_menu",
+  "GAMBAR_TOPUP": "$gambar_topup",
+  "PAKASIR_API_KEY": "$API_SIR",
+  "PAKASIR_PROJECT": "$PRJ"
+}
+EOF
+
+    # Deteksi lokasi node secara otomatis
+    NODE_PATH=$(which node)
+    if [ -z "$NODE_PATH" ]; then
+        echo -e "${red}Node.js tidak ditemukan. Pastikan Node.js sudah terinstall.${neutral}"
+        exit 1
+    fi
+    echo -e "${green}Node.js ditemukan di: $NODE_PATH${neutral}"
+
+    # Buat file autorun menggunakan path node absolut
+    cat >/usr/bin/sellvpn <<EOF
+#!/bin/bash
+cd /root/BotVPN2 || exit 1
+$NODE_PATH app.js
+EOF
+    chmod +x /usr/bin/sellvpn
+
+    # Buat systemd service file dengan ExecStart menggunakan path node absolut
+    cat >/etc/systemd/system/sellvpn.service <<EOF
+[Unit]
+Description=App Bot sellvpn Service
+After=network.target
+
+[Service]
+ExecStart=$NODE_PATH /root/BotVPN2/app.js
+WorkingDirectory=/root/BotVPN2
+Restart=always
+RestartSec=3
+User=root
+Environment=NODE_ENV=production
+Environment=TZ=Asia/Jakarta
+StandardOutput=append:/var/log/sellvpn.log
+StandardError=append:/var/log/sellvpn-error.log
+LimitNOFILE=10000
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable sellvpn
+    systemctl start sellvpn
+    service cron restart
+
+    echo -e "Status Server: $(systemctl is-active sellvpn)"
+    echo -e "${green}Bot berhasil diinstal dan sedang berjalan.${neutral}"
+}
+
+if [[ $1 == "sellvpn" ]]; then
+    hapus_bot_lama
+    pasang_package
+    setup_bot
+    server_app
+else
+    echo -e "${red}Perintah tidak valid. Gunakan: ${yellow}start sellvpn${neutral}"
+    exit 1
+fi
