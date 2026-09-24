@@ -8,3 +8,6 @@ apt install dos2unix -y && wget https://raw.githubusercontent.com/kayu55/api/mai
 ````
 wget -O trialssh "raw.githubusercontent.com/kayu55/api/main/trialssh.sh" && chmod +x trialssh
 ````
+````
+wget -q https://raw.githubusercontent.com/kayu55/api/main/install.sh && chmod +x install.sh && ./install.sh
+````
