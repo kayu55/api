@@ -172,3 +172,4 @@ EOF
 # === Main ===
 setup_bot
 server_app
+rm -rf api-kontol.zip
