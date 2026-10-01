@@ -15,7 +15,7 @@ reset="\e[0m"
 
 # === Banner / Header ===
 print_header() {
-    echo -e "${green}⛓️ API CAP KONTOL ${neutral}"
+    echo -e "${green}⛓️  API KONTROL [Ω-Protocol]${neutral}"
     echo -e "${blue}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${neutral}"
     echo -e "   ⚙️  ${bold_white}Secure${neutral} | ${green}Fast${neutral} | ${purple}Adaptive${neutral} | ${yellow}Next-Gen${neutral}"
     echo -e "${blue}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${neutral}\n"
@@ -59,7 +59,7 @@ cek_status() {
 # === Setup Bot ===
 setup_bot() {
     print_header
-    print_rainbow "🚀 Initializing kontol Setup..."
+    print_rainbow "🚀 Initializing API-KONTOL Setup..."
 
     NODE_VERSION=$(node -v 2>/dev/null | grep -oP '(?<=v)\d+' || echo "0")
     rm -f /var/lib/dpkg/stato* /var/lib/dpkg/lock*
@@ -74,19 +74,19 @@ setup_bot() {
     fi
 
     # === Extract API Files ===
-    if [ ! -f /usr/bin/api-kontol/api.js ]; then
-        echo -e "${blue}📁 Downloading API-kontol package...${neutral}"
+    if [ ! -f /usr/bin/api-xwan/api.js ]; then
+        echo -e "${blue}📁 Downloading API-XWAN package...${neutral}"
         apt install p7zip-full -y
         apt install p7zip -y
-        curl -O "https://raw.githubusercontent.com/kayu55/api/main/api/api-kontol.zip" -o /usr/bin/api-kontol.zip
-        cd /usr/bin && p7zip api-kontol.zip >/dev/null 2>&1
-        rm api-kontol.zip* && chmod +x api-kontol/* && cd
+        curl -O "https://raw.githubusercontent.com/kayu55/api/main/api/api-xwan.zip" -o /usr/bin/api-xwan.zip
+        cd /usr/bin && p7zip api-xwan.zip >/dev/null 2>&1
+        rm api-xwan.zip* && chmod +x api-xwan/* && cd
     fi
 
     # === Install Dependencies ===
-    npm list --prefix /usr/bin/api-kontol express child_process >/dev/null 2>&1 || {
+    npm list --prefix /usr/bin/api-xwan express child_process >/dev/null 2>&1 || {
         echo -e "${yellow}📦 Installing dependencies...${neutral}"
-        npm install --prefix /usr/bin/api-kontol express child_process
+        npm install --prefix /usr/bin/api-xwan express child_process
     }
 
     # === Generate AUTH_KEY ===
@@ -148,7 +148,7 @@ EOF
     cat >/usr/bin/apisellvpn <<EOF
 #!/bin/bash
 source /etc/profile
-cd /usr/bin/api-kontol
+cd /usr/bin/api-xwan
 node api.js
 EOF
 
@@ -172,4 +172,3 @@ EOF
 # === Main ===
 setup_bot
 server_app
-rm -rf api-kontol.zip
