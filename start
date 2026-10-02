@@ -59,6 +59,7 @@ setup_bot() {
     mkdir -p assets
     rm -rf app.js
     wget https://raw.githubusercontent.com/kayu55/api/main/app.js
+    wget https://raw.githubusercontent.com/kayu55/api/main/ecosystem.config.js
     cd assets
     wget https://raw.githubusercontent.com/kayu55/boot/main/botvpn/qris.png
     wget https://raw.githubusercontent.com/kayu55/boot/main/botvpn/topup_success.png
@@ -160,7 +161,7 @@ server_app() {
   "GOPAY_ID": "$gopay_id",
   "GOPAY_KEY": "$gopay_key",
   "DATA_QRIS_GOPAY": "$dataqrisgopay",
-  "AUTH_PAYMET_GETWAY": "AriPaymentGatewayVersion2026",
+  "AUTH_PAYMET_GETWAY": "SHOPEEPAY",
   "GROUP_USERNAME": "$username_grup",
   "CHANNEL_USERNAME": "$username_channel",
   "GAMBAR_MENU": "$gambar_menu",
