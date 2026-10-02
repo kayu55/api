@@ -14,7 +14,10 @@ const fetch = require('node-fetch');
 const FormData = require('form-data');
 const winston = require('winston');
 const { exec } = require('child_process');
-
+const {
+    createHcFile,
+    deleteHcFile
+} = require("./modules/hc_converter");
 
 
 // ============================================================
@@ -249,6 +252,22 @@ const PAKASIR_PROJECT = vars.PAKASIR_PROJECT;
 
 const PAY_BASE = "https://app.pakasir.com";
 
+// ==================== PAYOTOMATIS / SHOPEEPAY QRIS ====================
+const PAYOTOMATIS_KEY =
+    vars.PAYOTOMATIS_KEY ||
+    vars.SHOPEEPAY_API_KEY ||
+    vars.PAYOTOMATIS_API_KEY ||
+    '';
+
+const SHOPEEPAY_CREATE_API =
+    'https://payotomatis.app/api/createqris';
+
+const SHOPEEPAY_STATUS_API =
+    'https://payotomatis.app/api/mutasi/v2';
+
+const SHOPEEPAY_MUTASI_API =
+    'https://payotomatis.app/api/mutasi';
+// ======================================================================
 
 // ============================================================
 // 🤖 INITIALIZE TELEGRAM BOT
@@ -1982,7 +2001,156 @@ async function checkMembership(ctx) {
         return false;
     }
 }
+// ============================================================
+// 📡 MENU CEK KUOTA XL / AXIS
+// ============================================================
 
+bot.action('menu_cek_kuota', async (ctx) => {
+
+  try {
+
+    await ctx.answerCbQuery().catch(() => {});
+
+    const userId = ctx.from?.id;
+
+    if (!userId) {
+      return;
+    }
+
+    cekKuotaState[userId] = true;
+
+    const text = `
+<blockquote><b>📡 CEK KUOTA XL / AXIS</b>
+<code>Cek informasi paket dan kuota nomor XL/AXIS</code></blockquote>
+
+📱 <b>Masukkan nomor XL/AXIS</b>
+
+Contoh:
+<code>081234567890</code>
+
+atau
+
+<code>6281234567890</code>
+
+━━━━━━━━━━━━━━━━━━━━━
+⚡ <i>Nomor akan otomatis diproses.</i>
+`;
+
+    const keyboard = [
+      [
+        {
+          text: '🔙 Kembali ke Menu Utama',
+          callback_data: 'send_main_menu',
+          style: 'danger'
+        }
+      ]
+    ];
+
+    const msg = ctx.callbackQuery?.message;
+
+    if (msg?.photo) {
+
+      return await ctx.editMessageCaption(text, {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: keyboard
+        }
+      });
+
+    }
+
+    return await ctx.editMessageText(text, {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: keyboard
+      }
+    });
+
+  } catch (error) {
+
+    logger.error(
+      `❌ Error menu cek kuota: ${error.message}`
+    );
+
+    await ctx.reply(
+      '❌ Gagal membuka menu cek kuota.'
+    );
+
+  }
+
+});
+// ============================================================
+// 📡 CEK KUOTA XL / AXIS - SIDOMPUL
+// ============================================================
+
+async function cekKuotaSidompul(msisdn) {
+
+  try {
+
+    // Bersihkan nomor
+    msisdn = String(msisdn).replace(/[^0-9]/g, '');
+
+    // Minimal 10 digit
+    if (msisdn.length < 10) {
+      return {
+        success: false,
+        message: '❌ Nomor tidak valid.\n\nMasukkan nomor minimal 10 digit.'
+      };
+    }
+
+    // Ubah 62xxxxxxxx menjadi 0xxxxxxxx
+    if (msisdn.startsWith('62')) {
+      msisdn = '0' + msisdn.substring(2);
+    }
+
+    logger.info(`📡 Cek kuota Sidompul: ${msisdn}`);
+
+    const url =
+      `https://apigw.kmsp-store.com/sidompul/v4/cek_kuota?msisdn=${encodeURIComponent(msisdn)}&isJSON=true`;
+
+    const response = await axios.get(url, {
+      headers: {
+        'Authorization': 'Basic c2lkb21wdWxhcGk6YXBpZ3drbXNw',
+        'X-API-Key': '60ef29aa-a648-4668-90ae-20951ef90c55',
+        'X-App-Version': '4.0.0'
+      },
+      timeout: 30000
+    });
+
+    if (response.status !== 200) {
+      return {
+        success: false,
+        message: '❌ Maaf, server Sidompul sedang gangguan.'
+      };
+    }
+
+    const hasilKotor = response.data?.data?.hasil;
+
+    if (!hasilKotor) {
+      return {
+        success: false,
+        message: '❌ Data kuota tidak ditemukan.'
+      };
+    }
+
+    return {
+      success: true,
+      msisdn,
+      hasil: hasilKotor
+    };
+
+  } catch (error) {
+
+    logger.error(
+      `❌ Gagal cek kuota Sidompul: ${error.message}`
+    );
+
+    return {
+      success: false,
+      message: '❌ Maaf, server Sidompul sedang gangguan.'
+    };
+  }
+}
 
 // ============================================================
 // ♻️ RESTORE DATABASE BUTTON
@@ -2453,7 +2621,9 @@ db.run(`
         original_amount INTEGER,
         timestamp INTEGER,
         status TEXT,
-        qr_message_id INTEGER
+        qr_message_id INTEGER,
+        method TEXT,
+        payment_ref TEXT
     )
 `, (err) => {
 
@@ -2473,6 +2643,54 @@ db.run(`
     }
 
 });
+
+// ============================================================
+// MIGRASI KOLOM PENDING DEPOSITS
+// ============================================================
+
+db.run(
+    `ALTER TABLE pending_deposits ADD COLUMN method TEXT`,
+    (err) => {
+
+        if (err && !err.message.includes('duplicate column name')) {
+
+            logger.warn(
+                '⚠️ Gagal menambahkan kolom method:',
+                err.message
+            );
+
+        } else if (!err) {
+
+            logger.info(
+                '✅ Kolom method berhasil ditambahkan'
+            );
+
+        }
+
+    }
+);
+
+db.run(
+    `ALTER TABLE pending_deposits ADD COLUMN payment_ref TEXT`,
+    (err) => {
+
+        if (err && !err.message.includes('duplicate column name')) {
+
+            logger.warn(
+                '⚠️ Gagal menambahkan kolom payment_ref:',
+                err.message
+            );
+
+        } else if (!err) {
+
+            logger.info(
+                '✅ Kolom payment_ref berhasil ditambahkan'
+            );
+
+        }
+
+    }
+);
 
 
 // ============================================================
@@ -3199,6 +3417,7 @@ db.run(`
 
 const lastMenus = {};
 const userState = {};
+const cekKuotaState = {};
 
 logger.info(
     'User state initialized'
@@ -3744,6 +3963,14 @@ finalKeyboard.push([
   {
     text: '📊 Cek Statistik',
     callback_data: 'menu_statistik',
+    style: 'primary'
+  }
+]);
+
+finalKeyboard.push([
+  {
+    text: '📡 Cek Kuota XL/AXIS',
+    callback_data: 'menu_cek_kuota',
     style: 'primary'
   }
 ]);
@@ -4450,7 +4677,6 @@ bot.action('menu_trial', async (ctx) => {
 • VMESS
 • VLESS
 • TROJAN
-• SHADOWSOCKS
 `;
 
 const keyboard = [
@@ -4530,7 +4756,6 @@ bot.action('menu_create', async (ctx) => {
 • VMESS
 • VLESS
 • TROJAN
-• SHADOWSOCKS
 `;
 
 const keyboard = [
@@ -4610,7 +4835,6 @@ bot.action('menu_renew', async (ctx) => {
 • VMESS
 • VLESS
 • TROJAN
-• SHADOWSOCKS
 `;
 
 const keyboard = [
@@ -5593,57 +5817,381 @@ bot.on('text', async (ctx, next) => {
   const userId = ctx.from.id;
   const text = ctx.message?.text?.trim();
 
+  console.log('🔵 [TEXT] User:', userId, '| Text:', text);
+
   // ============================================================
   // 📣 HANDLE INPUT BROADCAST
   // ============================================================
 
   const state = broadcastState[userId];
 
-  // Tidak sedang menunggu input broadcast
-  if (!state || !state.type) {
-    return next();
+  if (state && state.type) {
+
+    console.log('📣 [BROADCAST] State:', state.type);
+
+    if (!text || text.startsWith('/')) {
+      console.log('⚠️ [BROADCAST] Command/kosong → next()');
+      return next();
+    }
+
+    const broadcastType = state.type;
+
+    delete broadcastState[userId];
+
+    logger.info(
+      `📣 Admin ${userId} mengirim isi broadcast ${broadcastType}`
+    );
+
+    try {
+
+      console.log('🚀 [BROADCAST] executeBroadcast mulai');
+
+      await executeBroadcast(
+        ctx,
+        broadcastType,
+        text
+      );
+
+      console.log('✅ [BROADCAST] executeBroadcast selesai');
+
+    } catch (error) {
+
+      console.log(
+        '❌ [BROADCAST] Error:',
+        error?.stack || error
+      );
+
+      logger.error(
+        `❌ Error broadcast ${broadcastType}: ${error.message}`
+      );
+
+      await ctx.reply(
+        '❌ Terjadi kesalahan saat menjalankan broadcast.'
+      );
+    }
+
+    return;
   }
 
-  // Jangan tangkap command
-  if (!text || text.startsWith('/')) {
-    return next();
-  }
-
-  // Simpan tipe broadcast
-  const broadcastType = state.type;
-
   // ============================================================
-  // ⚠️ PENTING:
-  // HAPUS STATE SEBELUM EXECUTE BROADCAST
-  // Supaya pesan berikutnya TIDAK ikut dianggap broadcast
+  // 📡 HANDLE INPUT CEK KUOTA XL / AXIS
   // ============================================================
 
-  delete broadcastState[userId];
+  const kuotaState = cekKuotaState[userId];
 
-  logger.info(
-    `📣 Admin ${userId} mengirim isi broadcast ${broadcastType}`
+  console.log(
+    '📡 [KUOTA] State:',
+    kuotaState ? 'DITEMUKAN' : 'TIDAK ADA'
   );
 
-  try {
+  if (kuotaState) {
 
-    await executeBroadcast(
-      ctx,
-      broadcastType,
-      text
+    if (!text || text.startsWith('/')) {
+      console.log('⚠️ [KUOTA] Command/kosong → next()');
+      return next();
+    }
+
+    delete cekKuotaState[userId];
+
+    console.log('🗑️ [KUOTA] State dihapus');
+
+    // ============================================================
+    // AMBIL NOMOR
+    // ============================================================
+
+    let msisdn = text.replace(/\D/g, '');
+
+    console.log('📱 [KUOTA] Nomor:', msisdn);
+
+    // ============================================================
+    // VALIDASI NOMOR
+    // ============================================================
+
+    if (msisdn.length < 10) {
+
+      console.log('❌ [KUOTA] Nomor tidak valid');
+
+      await ctx.reply(
+        '❌ <b>Nomor tidak valid.</b>\n\n' +
+        'Silakan masukkan nomor XL/AXIS yang benar.\n\n' +
+        'Contoh:\n' +
+        '<code>087812345678</code>',
+        {
+          parse_mode: 'HTML'
+        }
+      );
+
+      return;
+    }
+
+    // ============================================================
+    // UBAH 62xxxxxxxx MENJADI 0xxxxxxxx
+    // ============================================================
+
+    if (msisdn.startsWith('62')) {
+
+      console.log('🔄 [KUOTA] Konversi 62 → 0');
+
+      msisdn = '0' + msisdn.substring(2);
+
+      console.log(
+        '📱 [KUOTA] Nomor setelah konversi:',
+        msisdn
+      );
+    }
+
+    logger.info(
+      `📡 User ${userId} cek kuota nomor ${msisdn}`
     );
 
-  } catch (error) {
+    // ============================================================
+    // LOADING
+    // ============================================================
 
-    logger.error(
-      `❌ Error broadcast ${broadcastType}: ${error.message}`
+    console.log('⏳ [KUOTA] Mengirim loading');
+
+    const loading = await ctx.reply(
+      '⏳ <b>Sedang mengecek kuota...</b>\n\n' +
+      '<code>' + msisdn + '</code>\n\n' +
+      'Mohon tunggu...',
+      {
+        parse_mode: 'HTML'
+      }
     );
 
-    await ctx.reply(
-      '❌ Terjadi kesalahan saat menjalankan broadcast.'
+    console.log(
+      '✅ [KUOTA] Loading terkirim:',
+      loading.message_id
     );
+
+    // ============================================================
+    // PROSES CEK KUOTA
+    // ============================================================
+
+    try {
+
+      console.log(
+        '🚀 [KUOTA] Memanggil cekKuotaSidompul:',
+        msisdn
+      );
+
+      const hasil = await cekKuotaSidompul(msisdn);
+
+      console.log(
+        '✅ [KUOTA] cekKuotaSidompul selesai'
+      );
+
+      console.log(
+        '📦 [KUOTA] Type:',
+        typeof hasil
+      );
+
+      console.log(
+        '📦 [KUOTA] Hasil:',
+        hasil
+      );
+
+      // ========================================================
+      // HAPUS LOADING
+      // ========================================================
+
+      await ctx.telegram.deleteMessage(
+        ctx.chat.id,
+        loading.message_id
+      ).catch(() => {});
+
+      console.log('🗑️ [KUOTA] Loading dihapus');
+
+      // ========================================================
+      // HASIL CEK KUOTA
+      // ========================================================
+
+      console.log('🔎 [KUOTA] Mengecek hasil...');
+
+      if (hasil) {
+
+        console.log('🟢 [KUOTA] MASUK if (hasil)');
+        console.log('📦 [KUOTA] Data hasil:', hasil);
+
+        let hasilText;
+
+        // ======================================================
+        // HASIL OBJECT
+        // ======================================================
+
+        if (
+          typeof hasil === 'object' &&
+          hasil !== null
+        ) {
+
+          console.log(
+            '🟢 [KUOTA] Hasil berupa OBJECT'
+          );
+
+          // Ambil hanya field "hasil"
+          if (
+            Object.prototype.hasOwnProperty.call(
+              hasil,
+              'hasil'
+            )
+          ) {
+
+            hasilText = String(hasil.hasil);
+
+            console.log(
+              '📄 [KUOTA] Mengambil hasil.hasil'
+            );
+
+          } else {
+
+            hasilText = JSON.stringify(
+              hasil,
+              null,
+              2
+            );
+
+            console.log(
+              '⚠️ [KUOTA] Field hasil tidak ditemukan'
+            );
+          }
+
+        } else {
+
+          // ==================================================
+          // HASIL STRING
+          // ==================================================
+
+          hasilText = String(hasil);
+
+          console.log(
+            '🟡 [KUOTA] Hasil berupa STRING'
+          );
+        }
+
+        // ======================================================
+        // BERSIHKAN HTML <br>
+        // ======================================================
+
+        hasilText = hasilText
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<[^>]*>/g, '');
+
+        console.log(
+          '🧹 [KUOTA] HTML dibersihkan'
+        );
+
+        console.log(
+          '📝 [KUOTA] hasilText final:'
+        );
+
+        console.log(hasilText);
+
+// ======================================================
+// 📤 KIRIM HASIL
+// ======================================================
+
+console.log(
+  '📤 [KUOTA] Mengirim hasil ke Telegram...'
+);
+
+await ctx.reply(
+  '📡 <b>Hasil Cek Kuota XL/AXIS</b>\n\n' +
+  hasilText,
+  {
+    parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: '🔄 Cek Kuota Lagi',
+            callback_data: 'menu_cek_kuota',
+            style: 'primary'
+          }
+        ],
+        [
+          {
+            text: '🏠 Menu Utama',
+            callback_data: 'send_main_menu',
+            style: 'danger'
+          }
+        ]
+      ]
+    }
+  }
+);
+
+console.log(
+  '✅ [KUOTA] Hasil berhasil dikirim'
+);
+
+      } else {
+
+        console.log(
+          '🔴 [KUOTA] Hasil kosong:',
+          hasil
+        );
+
+        await ctx.reply(
+          '❌ <b>Data kuota tidak ditemukan.</b>',
+          {
+            parse_mode: 'HTML'
+          }
+        );
+      }
+
+    } catch (error) {
+
+      // ========================================================
+      // ERROR CEK KUOTA
+      // ========================================================
+
+      console.log(
+        '🔴 [KUOTA] ERROR:',
+        error?.stack || error
+      );
+
+      logger.error(
+        `❌ Gagal cek kuota ${msisdn}: ${error.message}`
+      );
+
+      await ctx.telegram.deleteMessage(
+        ctx.chat.id,
+        loading.message_id
+      ).catch(() => {});
+
+      await ctx.reply(
+        '❌ <b>Gagal mengecek kuota.</b>\n\n' +
+        'Silakan coba lagi beberapa saat.',
+        {
+          parse_mode: 'HTML'
+        }
+      );
+    }
+
+    console.log(
+      '🔚 [KUOTA] Selesai'
+    );
+
+    return;
   }
 
-  return;
+  // ============================================================
+  // TIDAK ADA STATE
+  // ============================================================
+
+  console.log(
+    '⚪ [KUOTA] Tidak ada state cek kuota'
+  );
+
+
+
+
+
+  // ============================================================
+  // 🔄 LANJUTKAN KE HANDLER TEXT LAIN
+  // ============================================================
+
+  return next();
 });
 
 function formatRupiah(angka) {
@@ -6327,6 +6875,16 @@ if (config.topup_saldo) {
     {
       text: "💸 Topup QRIS Orkut",
       callback_data: "topup_saldo",
+      style: "primary"
+    }
+  ]);
+}
+
+if (config.topup_shopeepay) {
+  keyboard.push([
+    {
+      text: "💸 Topup ShopeePay QRIS",
+      callback_data: "topup_shopeepay",
       style: "primary"
     }
   ]);
@@ -7328,6 +7886,13 @@ const adminKeyboard = [
 
   [
     {
+      text: `${config.topup_shopeepay ? '✅' : '❌'} Topup ShopeePay`,
+      callback_data: 'toggle_topup_shopeepay',
+      style: config.topup_shopeepay ? 'success' : 'danger'
+    }
+  ],
+  [
+    {
       text: '👥 List Reseller',
       callback_data: 'listreseller',
       style: 'primary'
@@ -7380,6 +7945,7 @@ ${showTrial ? '✅' : '❌'} TOMBOL TRIAL          ${showSewaScript ? '✅' : '�
 📈 HASIL PENJUALAN     📑 LOG TOPUP
 👥 LIST RESELLER       ${config.topup_gopay ? '✅' : '❌'} TOPUP GOPAY
 ${config.topup_pakasir ? '✅' : '❌'} TOPUP PAKASIR
+${config.topup_shopeepay ? '✅' : '❌'} TOPUP SHOPEEPAY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔙 KEMBALI
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -7415,6 +7981,31 @@ ${config.topup_pakasir ? '✅' : '❌'} TOPUP PAKASIR
     if (sent?.message_id && typeof lastMenus !== 'undefined') lastMenus[userId] = sent.message_id;
     return sent;
 }
+bot.action('toggle_topup_shopeepay', async (ctx) => {
+  await ctx.answerCbQuery();
+
+  const config = loadButtonConfig();
+
+  config.topup_shopeepay = !config.topup_shopeepay;
+
+  fs.writeFileSync(
+    './button_config.json',
+    JSON.stringify(config, null, 2)
+  );
+
+  await ctx.answerCbQuery(
+    `Topup ShopeePay ${
+      config.topup_shopeepay
+        ? 'diaktifkan ✅'
+        : 'dimatikan ❌'
+    }`,
+    {
+      show_alert: true
+    }
+  );
+
+  return sendAdminMenu(ctx);
+});
 bot.action('toggle_topup_gopay', async (ctx) => {
   await ctx.answerCbQuery();
 
@@ -8762,47 +9353,71 @@ if (global.depositState && (
   global.depositState[userId]?.action === 'request_amount_saweria' || 
   global.depositState[userId]?.action === 'request_amount_orkut' ||
   global.depositState[userId]?.action === 'request_amount_gopay' ||
-  global.depositState[userId]?.action === 'request_amount_pakasir'
+  global.depositState[userId]?.action === 'request_amount_pakasir' ||
+  global.depositState[userId]?.action === 'request_amount_shopeepay'
 )) {
-        const input = ctx.message.text.trim();
-        const nominal = parseInt(input.replace(/[^\d]/g, ''), 10);
+    const input = ctx.message.text.trim();
+    const nominal = parseInt(input.replace(/[^\d]/g, ''), 10);
 
-        if (isNaN(nominal) || nominal < 100) {
-            return ctx.reply('❌ *Nominal tidak valid. Minimal Rp100.*', { parse_mode: 'Markdown' });
-        }
+    if (isNaN(nominal) || nominal < 100) {
+        return ctx.reply(
+            '❌ *Nominal tidak valid. Minimal Rp100.*',
+            { parse_mode: 'Markdown' }
+        );
+    }
 
-        const topupAction = global.depositState[userId].action;
-        delete global.depositState[userId];
+    const topupAction = global.depositState[userId].action;
+    delete global.depositState[userId];
 
+    try {
+        await ctx.telegram.deleteMessage(
+            ctx.chat.id,
+            ctx.message.message_id
+        );
+    } catch (e) {
+        logger.warn(
+            `Gagal menghapus pesan input nominal dari user ${userId}: ${e.message}`
+        );
+    }
+
+    if (lastMenus[userId]) {
         try {
-            await ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id);
-        } catch (e) {
-            logger.warn(`Gagal menghapus pesan input nominal dari user ${userId}: ${e.message}`);
-        }
-
-        if (lastMenus[userId]) {
-          try {
-            await ctx.telegram.deleteMessage(ctx.chat.id, lastMenus[userId]);
+            await ctx.telegram.deleteMessage(
+                ctx.chat.id,
+                lastMenus[userId]
+            );
             delete lastMenus[userId];
-          } catch (e) {
-            logger.warn(`Gagal menghapus pesan permintaan nominal awal bot untuk user ${userId}: ${e.message}`);
-          }
+        } catch (e) {
+            logger.warn(
+                `Gagal menghapus pesan permintaan nominal awal bot untuk user ${userId}: ${e.message}`
+            );
         }
+    }
 
-        if (topupAction === 'request_amount_saweria') {
+    if (topupAction === 'request_amount_saweria') {
+
         await processDepositSaweria(ctx, nominal);
 
-        } else if (topupAction === 'request_amount_orkut') {
-         await processDeposit(ctx, nominal);
+    } else if (topupAction === 'request_amount_orkut') {
 
-        } else if (topupAction === 'request_amount_gopay') {
-         await processDepositGopay(ctx, nominal);
+        await processDeposit(ctx, nominal);
 
-        } else if (topupAction === 'request_amount_pakasir') {
-         await processDepositPakasir(ctx, nominal);
-        }
-        return;
+    } else if (topupAction === 'request_amount_gopay') {
+
+        await processDepositGopay(ctx, nominal);
+
+    } else if (topupAction === 'request_amount_pakasir') {
+
+        await processDepositPakasir(ctx, nominal);
+
+    } else if (topupAction === 'request_amount_shopeepay') {
+
+        await processDepositShopeePay(ctx, nominal);
+
     }
+
+    return;
+}
       // ================================
 // SIMPAN CLOUDFRONT
 // ================================
@@ -10916,6 +11531,104 @@ return sent;
   }
 }
 });
+/// shopipay
+bot.action('topup_shopeepay', async (ctx) => {
+  const userId = ctx.from.id;
+  const chatId = ctx.chat.id;
+
+  try {
+    await ctx.answerCbQuery();
+    logger.info(`🔍 User ${userId} memulai proses top-up saldo (ShopeePay QRIS).`);
+
+    if (lastMenus[userId]) {
+      try {
+        await bot.telegram.deleteMessage(chatId, lastMenus[userId]);
+        logger.info(`🧹 Menu lama milik ${userId} berhasil dihapus`);
+        delete lastMenus[userId];
+      } catch (e) {
+        console.warn(
+          `⚠️ Gagal menghapus menu sebelumnya untuk ${userId}:`,
+          e.message
+        );
+      }
+    }
+
+    // Simpan state bahwa user diminta memasukkan nominal ShopeePay
+    if (!global.depositState) global.depositState = {};
+
+    global.depositState[userId] = {
+      action: 'request_amount_shopeepay',
+      amount: ''
+    };
+
+    logger.info(
+      `📝 Menunggu input nominal dari user ${userId} untuk ShopeePay QRIS`
+    );
+
+    // Kirim instruksi ke user
+    const sent = await ctx.reply(
+`
+🟠━━━━━━━━━━━━━━━━━━━━🟠
+      *SʜᴏᴘᴇᴇPᴀʏ Qʀɪs Tᴏᴘ-ᴜᴘ*
+🟠━━━━━━━━━━━━━━━━━━━━🟠
+
+⚡ *Sɪʟᴀʜᴋᴀɴ Kᴇᴛɪᴋ Nᴏᴍɪɴᴀʟ Tᴏᴘ-ᴜᴘ*
+
+💰 *Minimal top-up:* Rp 100
+🧾 *Contoh:* \`10000\`
+
+━━━━━━━━━━━━━━━━━━━━━━━
+⌛ Kᴇᴍᴜᴅɪᴀɴ ᴛᴜɴɢɢᴜ ᴘʀᴏsᴇs ᴏᴛᴏᴍᴀᴛɪs.
+
+💳 Pᴇᴍʙᴀʏᴀʀᴀɴ ᴅɪʟᴀᴋᴜᴋᴀɴ
+ᴍᴇʟᴀʟᴜɪ Qʀɪs SʜᴏᴘᴇᴇPᴀʏ.
+
+━━━━━━━━━━━━━━━━━━━━━━━
+`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '❌ Batal',
+                callback_data: 'send_main_menu',
+                style: 'danger'
+              }
+            ]
+          ]
+        }
+      }
+    );
+
+    // Simpan message_id untuk tracking
+    if (sent?.message_id) {
+      lastMenus[userId] = sent.message_id;
+    }
+
+    return sent;
+
+  } catch (error) {
+    logger.error(
+      '❌ Kesalahan saat memulai top-up saldo (ShopeePay QRIS):',
+      error
+    );
+
+    try {
+      await ctx.reply(
+        '❌ *GAGAL! Terjadi kesalahan saat memproses permintaan Anda. Silahkan coba lagi nanti.*',
+        {
+          parse_mode: 'Markdown'
+        }
+      );
+    } catch (e) {
+      logger.error(
+        'Gagal kirim pesan error:',
+        e.message
+      );
+    }
+  }
+});
 // =========== TOPUP QRIS SAWERIA ===========
 bot.action('topup_saweria', async (ctx) => {
   const userId = ctx.from.id;
@@ -11681,18 +12394,31 @@ db.all('SELECT * FROM pending_deposits WHERE status = "pending"', [], (err, rows
     logger.error('Gagal load pending_deposits:', err.message);
     return;
   }
+
   rows.forEach(row => {
     global.pendingDeposits[row.unique_code] = {
+      transaction_id: row.unique_code,
+
       amount: row.amount,
       originalAmount: row.original_amount,
       userId: row.user_id,
       username: row.username,
       timestamp: row.timestamp,
       status: row.status,
-      qrMessageId: row.qr_message_id
+      qrMessageId: row.qr_message_id,
+
+      // ✅ Metode pembayaran
+      method: row.method || 'QRIS Orkut',
+
+      // ✅ Referensi transaksi PayOtomatis
+      payment_ref: row.payment_ref || null
     };
   });
-  logger.info('Pending deposit loaded:', Object.keys(global.pendingDeposits).length);
+
+  logger.info(
+    'Pending deposit loaded:',
+    Object.keys(global.pendingDeposits).length
+  );
 });
 
 const config = {
@@ -12066,20 +12792,544 @@ const qrMessage = await ctx.replyWithPhoto(
   }
 }
 
+async function processDepositShopeePay(ctx, amount) {
+  const currentTime = Date.now();
+  const userId = ctx.from.id;
 
-function insertPendingDeposit(uniqueCode, userId, username, finalAmount, originalAmount, qrMessageId) {
-  return new Promise((resolve, reject) => {
-    db.run(
-      `INSERT INTO pending_deposits (unique_code, user_id, username, amount, original_amount, timestamp, status, qr_message_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [uniqueCode, userId, username, finalAmount, originalAmount, Date.now(), 'pending', qrMessageId],
-      (err) => {
-        if (err) {
-          logger.error('Gagal insert pending_deposits:', err.message);
-          reject(err);
-        } else {
-          resolve();
+  // ==================== ANTI SPAM ====================
+
+  global.depositState ??= {};
+
+  if (global.depositState[userId]) {
+    return ctx.reply(
+      "⚠️ Kamu masih punya transaksi deposit yang belum selesai!"
+    );
+  }
+
+  if (currentTime - lastRequestTime < requestInterval) {
+    return ctx.reply(
+      "⚠️ *Terlalu banyak permintaan. Silahkan tunggu sebentar sebelum mencoba lagi.*",
+      { parse_mode: "Markdown" }
+    );
+  }
+
+  // ==================== VALIDASI NOMINAL ====================
+
+  const nominal = Number(amount);
+
+  if (
+    !Number.isSafeInteger(nominal) ||
+    nominal < 100
+  ) {
+    return ctx.reply(
+      "❌ *Nominal tidak valid. Minimal Rp100.*",
+      { parse_mode: "Markdown" }
+    );
+  }
+
+  // ==================== FEE RANDOM SEPERTI ORKUT ====================
+
+  if (typeof generateRandomAmount !== "function") {
+    logger.error(
+      "[SHOPEEPAY] Fungsi generateRandomAmount tidak tersedia"
+    );
+
+    return ctx.reply(
+      "❌ Terjadi kesalahan konfigurasi pembayaran. Hubungi admin."
+    );
+  }
+
+  // Fee unik acak Rp1-Rp99
+  const finalAmount = generateRandomAmount(nominal);
+  const fee = finalAmount - nominal;
+
+  logger.info(
+    `[SHOPEEPAY] Nominal=${nominal} | Fee=${fee} | Total=${finalAmount}`
+  );
+
+  // ==================== CEK API KEY ====================
+
+  if (!PAYOTOMATIS_KEY) {
+    logger.error(
+      "[SHOPEEPAY] PAYOTOMATIS_KEY belum dikonfigurasi."
+    );
+
+    return ctx.reply(
+      "❌ *Pembayaran ShopeePay sedang tidak tersedia.*\n\n" +
+      "Silahkan hubungi admin.",
+      { parse_mode: "Markdown" }
+    );
+  }
+
+  // ==================== UNIQUE CODE ====================
+
+  const uniqueCode = `SHOPEEPAY-${userId}-${Date.now()}`;
+
+  global.pendingDeposits ??= {};
+  global.depositState[userId] = true;
+  lastRequestTime = currentTime;
+
+  // ==================== TIMEOUT ====================
+
+  const withTimeout = (promise, ms, message = "Waktu tunggu habis") =>
+    Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(message)), ms)
+      )
+    ]);
+
+  // ==================== RESET ====================
+
+  async function resetDepositState() {
+    try {
+      delete global.depositState[userId];
+      delete global.pendingDeposits[uniqueCode];
+
+      await deletePendingDeposit(uniqueCode).catch(() => {});
+    } catch (e) {
+      logger.error(
+        "[SHOPEEPAY] Gagal reset deposit:",
+        e.message
+      );
+    }
+  }
+
+  let waitMsg;
+  let loading;
+  const start = Date.now();
+
+  try {
+    // ==================== LOADING ====================
+
+    waitMsg = await ctx.reply("⏳ Mohon menunggu...");
+
+    let dots = 0;
+
+    loading = setInterval(async () => {
+      dots = (dots + 1) % 4;
+
+      try {
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          waitMsg.message_id,
+          null,
+          "⏳ Mohon menunggu" + ".".repeat(dots)
+        );
+      } catch {
+        clearInterval(loading);
+      }
+    }, 700);
+
+    // ==================== BUTTON ====================
+
+    const inlineKeyboard = [
+      [
+        {
+          text: "📢 Join Channel",
+          url: `https://t.me/${GROUP_USERNAME}`,
+          style: "primary"
         }
+      ],
+      [
+        {
+          text: "❌ Batal Topup",
+          callback_data: `batal_topup_${uniqueCode}`,
+          style: "danger"
+        }
+      ]
+    ];
+
+    // ==================== CREATE QRIS PAYOTOMATIS ====================
+
+    let response;
+
+    try {
+      response = await withTimeout(
+        axios.get(SHOPEEPAY_CREATE_API, {
+          params: {
+            key: PAYOTOMATIS_KEY,
+
+            // Total termasuk fee random
+            amount: finalAmount
+          },
+          timeout: 20000
+        }),
+        30000,
+        "Timeout create QRIS ShopeePay"
+      );
+    } catch (err) {
+      clearInterval(loading);
+
+      logger.error(
+        "[SHOPEEPAY] Gagal request create QRIS:",
+        err.response?.data || err.message
+      );
+
+      await ctx.reply(
+        "❌ Gagal membuat QRIS ShopeePay. Silakan coba lagi nanti."
+      );
+
+      await resetDepositState();
+      return;
+    }
+
+    const result = response?.data;
+
+    logger.info(
+      `[SHOPEEPAY] FULL RESPONSE USER ${userId}: ` +
+      JSON.stringify(result)
+    );
+
+    // ==================== AMBIL DATA RESPONSE ====================
+
+    const data =
+      result?.data ||
+      result?.result ||
+      result?.response ||
+      result?.payment ||
+      result;
+
+    // ==================== AMBIL ORDER ID ====================
+
+    const orderSn =
+      data?.order_sn ||
+      data?.orderSn ||
+      data?.order_id ||
+      data?.orderId ||
+      data?.order_no ||
+      data?.orderNo ||
+      data?.trx_id ||
+      data?.trxId ||
+      data?.transaction_id ||
+      data?.transactionId ||
+      data?.reference_id ||
+      data?.referenceId ||
+      result?.order_sn ||
+      result?.order_id ||
+      result?.transaction_id ||
+      result?.reference_id ||
+      null;
+
+    // ==================== AMBIL DATA QRIS ====================
+
+    const qrData =
+      data?.qr_image_url ||
+      data?.qris ||
+      data?.qr_string ||
+      data?.qrString ||
+      data?.qr_content ||
+      data?.qrContent ||
+      data?.qris_string ||
+      data?.qrisString ||
+      data?.payment_number ||
+      data?.paymentNumber ||
+      data?.qr_url ||
+      data?.qrUrl ||
+      data?.qris_url ||
+      data?.qrisUrl ||
+      data?.qr_image ||
+      data?.qrImage ||
+      data?.image ||
+      data?.qr ||
+      result?.qr_image_url ||
+      result?.qris ||
+      result?.qr_string ||
+      result?.qr_content ||
+      result?.qr_url ||
+      result?.qris_url ||
+      result?.qr_image ||
+      result?.image ||
+      result?.qr ||
+      null;
+
+    logger.info(
+      `[SHOPEEPAY] PARSED | orderSn=${orderSn} | ` +
+      `qrData=${qrData ? "ADA" : "TIDAK ADA"}`
+    );
+
+    if (!orderSn) {
+      clearInterval(loading);
+
+      logger.error(
+        "[SHOPEEPAY] order_sn tidak ditemukan:",
+        JSON.stringify(result)
+      );
+
+      await ctx.reply(
+        "❌ Gagal mendapatkan ID transaksi ShopeePay."
+      );
+
+      await resetDepositState();
+      return;
+    }
+
+    if (!qrData) {
+      clearInterval(loading);
+
+      logger.error(
+        "[SHOPEEPAY] Data QRIS tidak ditemukan:",
+        JSON.stringify(result)
+      );
+
+      await ctx.reply(
+        "❌ Gagal mendapatkan QRIS ShopeePay."
+      );
+
+      await resetDepositState();
+      return;
+    }
+
+    // ==================== EXPIRED ====================
+
+    const paymentExpirySeconds = Number(
+      data?.expires_in_seconds || 1200
+    );
+
+    const payment = {
+      payment_number: qrData,
+      qrString: qrData,
+
+      // Saldo member
+      amount: nominal,
+
+      // Fee random
+      fee: fee,
+
+      // Total yang harus dibayar
+      total_payment: finalAmount,
+
+      order_id: orderSn,
+
+      expired_at: new Date(
+        Date.now() + paymentExpirySeconds * 1000
+      ).toISOString()
+    };
+
+    // ==================== EKSTRAK QR STRING ====================
+
+    let qrString = qrData;
+
+    if (
+      typeof qrData === "string" &&
+      /^https?:\/\//i.test(qrData)
+    ) {
+      try {
+        const qrUrl = new URL(qrData);
+        const encodedQrString = qrUrl.searchParams.get("data");
+
+        if (encodedQrString) {
+          qrString = encodedQrString;
+        }
+      } catch (urlError) {
+        logger.warn(
+          `[SHOPEEPAY] Gagal mengambil QR string: ${urlError.message}`
+        );
+      }
+    }
+
+    if (!qrString) {
+      throw new Error("QR string ShopeePay tidak ditemukan");
+    }
+
+    payment.payment_number = qrString;
+    payment.qrString = qrString;
+
+    const expiredz = new Date(
+      payment.expired_at
+    ).toLocaleString("id-ID", {
+      timeZone: "Asia/Jakarta",
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    // ==================== GENERATE TEMPLATE QRIS ====================
+
+    let qrMessage;
+
+    try {
+      const qrisImage = await generateQrisTemplate(payment);
+
+      qrMessage = await ctx.replyWithPhoto(
+        { source: qrisImage },
+        {
+          caption: `
+┏━━━━━━━━━━━━━━━━━━━━━┓
+      🏷️ *ᴅᴇᴛᴀɪʟ ᴘᴇᴍʙᴀʏᴀʀᴀɴ*
+┗━━━━━━━━━━━━━━━━━━━━━┛
+
+💰 ɴᴏᴍɪɴᴀʟ ᴛᴏᴘᴜᴘ : *Rp ${nominal.toLocaleString("id-ID")}*
+💸 ꜰᴇᴇ QRIS       : *Rp ${fee.toLocaleString("id-ID")}*
+💵 ᴛᴏᴛᴀʟ ʙᴀʏᴀʀ    : *Rp ${finalAmount.toLocaleString("id-ID")}*
+
+🆔 ʀᴇꜰꜰ : \`${orderSn}\`
+⏳ ᴇxᴘɪʀᴇᴅ : *${expiredz}*
+
+⚠️ ᴛʀᴀɴꜱꜰᴇʀ ʜᴀʀᴜꜱ ꜱᴇꜱᴜᴀɪ *TOTAL BAYAR*
+          `,
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: inlineKeyboard
+          }
+        }
+      );
+    } catch (qrError) {
+      logger.error(
+        "[SHOPEEPAY] Gagal membuat/mengirim template QR:",
+        qrError
+      );
+
+      await ctx.reply(
+        "❌ Gagal membuat QRIS ShopeePay."
+      );
+
+      clearInterval(loading);
+      await resetDepositState();
+      return;
+    }
+
+    // ==================== HAPUS LOADING ====================
+
+    clearInterval(loading);
+
+    try {
+      await ctx.deleteMessage(waitMsg.message_id);
+    } catch {}
+
+    // ==================== SIMPAN MEMORY ====================
+
+    global.pendingDeposits[uniqueCode] = {
+      transaction_id: orderSn,
+      order_sn: orderSn,
+      payment_ref: orderSn,
+
+      // Total transaksi yang dibayar
+      amount: finalAmount,
+      total_payment: finalAmount,
+
+      // Nominal saldo member
+      originalAmount: nominal,
+
+      // Fee random
+      fee: fee,
+
+      userId,
+
+      username:
+        ctx.from.username ||
+        `user_${userId}`,
+
+      timestamp: Date.now(),
+      status: "pending",
+      method: "ShopeePay QRIS",
+
+      qrMessageId: qrMessage.message_id
+    };
+
+    // ==================== SIMPAN DATABASE ====================
+
+    await insertPendingDeposit(
+      uniqueCode,
+      userId,
+      ctx.from.username || `user_${userId}`,
+      finalAmount,
+      nominal,
+      qrMessage.message_id,
+      "ShopeePay QRIS",
+      orderSn
+    );
+
+    delete global.depositState[userId];
+
+    logger.info(
+      `[SHOPEEPAY] Deposit dibuat | user=${userId} | ` +
+      `nominal=${nominal} | fee=${fee} | total=${finalAmount} | ` +
+      `order=${orderSn} | durasi=${Date.now() - start}ms`
+    );
+
+  } catch (error) {
+    clearInterval(loading);
+
+    logger.error(
+      "[SHOPEEPAY] Kesalahan memproses deposit:",
+      error.response?.data || error.message
+    );
+
+    await resetDepositState();
+
+    try {
+      await ctx.reply(
+        "❌ *GAGAL!* Terjadi kesalahan saat memproses pembayaran ShopeePay. Silahkan coba lagi nanti.",
+        { parse_mode: "Markdown" }
+      );
+    } catch (e) {
+      logger.error(
+        "[SHOPEEPAY] Gagal mengirim pesan error:",
+        e.message
+      );
+    }
+  }
+}
+
+
+function insertPendingDeposit(
+  uniqueCode,
+  userId,
+  username,
+  finalAmount,
+  originalAmount,
+  qrMessageId,
+  method = 'QRIS Orkut',
+  paymentRef = null
+) {
+  return new Promise((resolve, reject) => {
+
+    db.run(
+      `INSERT INTO pending_deposits (
+        unique_code,
+        user_id,
+        username,
+        amount,
+        original_amount,
+        timestamp,
+        status,
+        qr_message_id,
+        method,
+        payment_ref
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        uniqueCode,
+        userId,
+        username,
+        finalAmount,
+        originalAmount,
+        Date.now(),
+        'pending',
+        qrMessageId,
+        method,
+        paymentRef
+      ],
+      (err) => {
+
+        if (err) {
+          logger.error(
+            'Gagal insert pending_deposits:',
+            err.message
+          );
+
+          reject(err);
+
+        } else {
+
+          resolve();
+
+        }
+
       }
     );
   });
@@ -12444,6 +13694,22 @@ async function checkQRISStatus() {
 
       try {
 
+        // ============================================================
+        // SHOPEEPAY QRIS - PAYOTOMATIS
+        // ============================================================
+        if (deposit.method === "ShopeePay QRIS") {
+
+          await checkShopeePayPayment(
+            uniqueCode,
+            deposit
+          );
+
+          continue;
+        }
+
+        // ============================================================
+        // QRIS ORKUT - JANGAN DIUBAH
+        // ============================================================
         const checkPaymentUrl =
           `https://bat.aroma.web.id/mutasi?token=${API_KEY}`;
 
@@ -12567,6 +13833,306 @@ async function checkQRISStatus() {
         : err.message)
     );
 
+  }
+}
+
+// ============================================================
+// CHECK PAYMENT SHOPEEPAY QRIS - PAYOTOMATIS
+// ============================================================
+async function checkShopeePayPayment(uniqueCode, deposit) {
+  if (
+    !deposit ||
+    deposit.status !== "pending" ||
+    deposit.method !== "ShopeePay QRIS"
+  ) {
+    return false;
+  }
+
+  global.shopeePayChecking ??= new Set();
+
+  // Cegah checker bersamaan untuk deposit yang sama
+  if (global.shopeePayChecking.has(uniqueCode)) {
+    return false;
+  }
+
+  global.shopeePayChecking.add(uniqueCode);
+
+  try {
+    const apiKey = PAYOTOMATIS_KEY;
+
+    if (!apiKey) {
+      logger.error(
+        "[SHOPEEPAY] PAYOTOMATIS_KEY belum dikonfigurasi"
+      );
+      return false;
+    }
+
+    const orderSn = String(
+      deposit.order_sn ||
+      deposit.payment_ref ||
+      deposit.transaction_id ||
+      ""
+    ).trim();
+
+    if (!orderSn) {
+      logger.warn(
+        `[SHOPEEPAY] order_sn tidak ditemukan | ${uniqueCode}`
+      );
+      return false;
+    }
+
+    // Total pembayaran: nominal top up + fee random
+    const expectedAmount = Number(
+      deposit.total_payment ?? deposit.amount ?? 0
+    );
+
+    if (
+      !Number.isSafeInteger(expectedAmount) ||
+      expectedAmount <= 0
+    ) {
+      logger.warn(
+        `[SHOPEEPAY] Total pembayaran tidak valid | ${uniqueCode}`
+      );
+      return false;
+    }
+
+    const statusUrl =
+      `${SHOPEEPAY_STATUS_API}?order_sn=${encodeURIComponent(orderSn)}` +
+      `&key=${encodeURIComponent(apiKey)}`;
+
+    const { data } = await axios.get(statusUrl, {
+      timeout: 15000
+    });
+
+    logger.info(
+      `[SHOPEEPAY STATUS] ${uniqueCode} | ${JSON.stringify(data)}`
+    );
+
+    if (data?.success !== true) {
+      logger.warn(
+        `[SHOPEEPAY] Response API tidak sukses | ${uniqueCode}`
+      );
+      return false;
+    }
+
+    // Cari transaksi berdasarkan order_sn yang persis sama
+    const list = Array.isArray(data?.data?.list)
+      ? data.data.list
+      : Array.isArray(data?.list)
+        ? data.list
+        : [];
+
+    const matchedTx =
+      data?.matched_tx ||
+      list.find((tx) =>
+        String(
+          tx?.order_sn ||
+          tx?.payment_ref ||
+          tx?.reference_id ||
+          ""
+        ).trim() === orderSn
+      ) ||
+      null;
+
+    if (!matchedTx) {
+      logger.info(
+        `[SHOPEEPAY] Transaksi belum ditemukan | ${uniqueCode} | ${orderSn}`
+      );
+      return false;
+    }
+
+    // Validasi transaksi masuk jika API menyediakan penanda uang masuk
+    if (
+      matchedTx.is_money_in !== undefined &&
+      matchedTx.is_money_in !== true
+    ) {
+      logger.warn(
+        `[SHOPEEPAY] Transaksi bukan uang masuk | ${uniqueCode}`
+      );
+      return false;
+    }
+
+    // Status 1 digunakan sesuai contoh respons API sebelumnya.
+    // Jika provider menggunakan arti status berbeda, sesuaikan dengan dokumentasinya.
+    const txStatus = Number(
+      matchedTx.status ??
+      matchedTx.orderStatus ??
+      data?.orderStatus
+    );
+
+    const paid =
+      data?.paid === true ||
+      Number(matchedTx.orderStatus) === 3 ||
+      (
+        matchedTx.is_money_in === true &&
+        txStatus === 1
+      );
+
+    if (!paid) {
+      logger.info(
+        `[SHOPEEPAY] Belum terkonfirmasi lunas | ${uniqueCode} | status=${txStatus}`
+      );
+      return false;
+    }
+
+    // Parsing nominal, termasuk format "+Rp10.137"
+    function parsePaidAmount(value) {
+      if (typeof value === "number") {
+        return Number.isSafeInteger(value) ? value : null;
+      }
+
+      if (value === null || value === undefined) {
+        return null;
+      }
+
+      let text = String(value)
+        .replace(/Rp/gi, "")
+        .replace(/\s/g, "")
+        .replace(/^\+/, "")
+        .trim();
+
+      if (!text) return null;
+
+      // Format Indonesia: 10.137 atau 10,137
+      if (/^\d{1,3}(\.\d{3})+$/.test(text)) {
+        text = text.replace(/\./g, "");
+      } else if (/^\d{1,3}(,\d{3})+$/.test(text)) {
+        text = text.replace(/,/g, "");
+      }
+
+      if (!/^\d+$/.test(text)) {
+        return null;
+      }
+
+      const amount = Number(text);
+
+      return Number.isSafeInteger(amount) ? amount : null;
+    }
+
+    const rawPaidAmount =
+      matchedTx.amount ??
+      matchedTx.total_amount ??
+      data?.amount ??
+      data?.total_amount ??
+      null;
+
+    const paidAmount = parsePaidAmount(rawPaidAmount);
+
+    logger.info(
+      `[SHOPEEPAY MATCH] ${uniqueCode} | ` +
+      `API=${paidAmount} | EXPECT=${expectedAmount} | ORDER=${orderSn}`
+    );
+
+    // Nominal wajib cocok persis, termasuk fee random
+    if (
+      paidAmount === null ||
+      paidAmount !== expectedAmount
+    ) {
+      logger.warn(
+        `[SHOPEEPAY] Nominal tidak cocok | ` +
+        `API=${paidAmount} | EXPECT=${expectedAmount} | ORDER=${orderSn}`
+      );
+      return false;
+    }
+
+    global.processedTransactions ??= new Set();
+
+    const transactionId = String(
+      matchedTx.transactionId ||
+      matchedTx.transaction_id ||
+      matchedTx.id ||
+      orderSn
+    );
+
+    const transactionKey =
+      `SHOPEEPAY_${orderSn}_${transactionId}_${paidAmount}`;
+
+    if (global.processedTransactions.has(transactionKey)) {
+      logger.warn(
+        `[SHOPEEPAY] Transaksi sudah pernah diproses | ${transactionKey}`
+      );
+      return false;
+    }
+
+    // Pastikan deposit masih pending sebelum diproses
+    if (deposit.status !== "pending") {
+      return false;
+    }
+
+    deposit.status = "processing";
+
+    const transaction = {
+      transaction_id: transactionId,
+      reference_id: transactionId,
+      order_sn: orderSn,
+      amount: paidAmount,
+      total: paidAmount,
+      transaction_status: 2,
+      orderStatus: txStatus,
+      is_money_in: matchedTx.is_money_in,
+      paid_at: matchedTx.paid_at || data?.paid_at || null
+    };
+
+    const success = await processMatchingPayment(
+      deposit,
+      transaction,
+      uniqueCode
+    );
+
+    if (!success) {
+      deposit.status = "pending";
+
+      logger.warn(
+        `[SHOPEEPAY] processMatchingPayment gagal | ${uniqueCode}`
+      );
+
+      return false;
+    }
+
+    global.processedTransactions.add(transactionKey);
+
+    deposit.status = "success";
+
+    if (global.pendingDeposits) {
+      delete global.pendingDeposits[uniqueCode];
+    }
+
+    db.run(
+      "DELETE FROM pending_deposits WHERE unique_code = ?",
+      [uniqueCode],
+      (err) => {
+        if (err) {
+          logger.error(
+            `[SHOPEEPAY] Gagal menghapus pending deposit ${uniqueCode}: ${err.message}`
+          );
+        }
+      }
+    );
+
+    logger.info(
+      `✅ [SHOPEEPAY] Berhasil diproses | ${uniqueCode} | ` +
+      `orderSn=${orderSn} | paid=${paidAmount}`
+    );
+
+    return true;
+
+  } catch (err) {
+    if (deposit?.status === "processing") {
+      deposit.status = "pending";
+    }
+
+    logger.error(
+      `[SHOPEEPAY] Error cek pembayaran ${uniqueCode}: ${
+        err.response?.data
+          ? JSON.stringify(err.response.data)
+          : err.message
+      }`
+    );
+
+    return false;
+
+  } finally {
+    global.shopeePayChecking.delete(uniqueCode);
   }
 }
 
@@ -13164,106 +14730,193 @@ ${bonusLine}💳 Saldo Sekarang  : Rp${balanceAmount.toLocaleString('id-ID')}
   }
 }
 // Anda mungkin perlu menyesuaikan fungsi ini sesuai dengan data yang Anda butuhkan
-async function processMatchingPayment(deposit, matchingTransaction, uniqueCode) {
-  const transactionId =
+async function processMatchingPayment(
+  deposit,
+  matchingTransaction,
+  uniqueCode
+) {
+  const transactionId = String(
     matchingTransaction.transaction_id ||
+    matchingTransaction.order_sn ||
     matchingTransaction.issuer_reff ||
     matchingTransaction.reference_id ||
     matchingTransaction.trx_id ||
-    matchingTransaction.id;
-
-  const paidAmount = Number(
-    matchingTransaction.amount || 0
+    matchingTransaction.id ||
+    uniqueCode
   );
 
-  const amount = Number(
-    deposit.originalAmount ||
-    deposit.amount ||
-    0
+  // Nominal saldo harus nominal top up asli,
+  // bukan total pembayaran + fee random.
+  const rawOriginalAmount =
+    deposit.originalAmount ?? deposit.amount;
+
+  const amount = Number(rawOriginalAmount);
+  const paidAmount = Number(matchingTransaction.amount || 0);
+
+  if (
+    !Number.isSafeInteger(amount) ||
+    amount <= 0
+  ) {
+    logger.error(
+      `[MATCH] Nominal top up asli tidak valid | ${uniqueCode}`
+    );
+    return false;
+  }
+
+  if (
+    !Number.isSafeInteger(paidAmount) ||
+    paidAmount <= 0
+  ) {
+    logger.error(
+      `[MATCH] Nominal pembayaran tidak valid | ${uniqueCode}`
+    );
+    return false;
+  }
+
+  // Validasi total bayar jika nominal total tersedia.
+  const expectedPayment = Number(
+    deposit.total_payment ?? deposit.amount
   );
+
+  if (
+    Number.isSafeInteger(expectedPayment) &&
+    expectedPayment > 0 &&
+    paidAmount !== expectedPayment
+  ) {
+    logger.warn(
+      `[MATCH] Nominal pembayaran tidak cocok | ` +
+      `paid=${paidAmount} | expected=${expectedPayment}`
+    );
+    return false;
+  }
 
   deposit.originalAmount = amount;
 
   const paymentMethod =
     deposit.method ||
     deposit.paymentMethod ||
-    'QRIS Orkut';
+    "QRIS Orkut";
 
   if (!deposit.username) {
     try {
-      const telegramUser = await bot.telegram.getChat(deposit.userId);
-      deposit.username = telegramUser.username || 'Tidak tersedia';
+      const telegramUser = await bot.telegram.getChat(
+        deposit.userId
+      );
+
+      deposit.username =
+        telegramUser.username || "Tidak tersedia";
     } catch (e) {
-      deposit.username = 'Tidak tersedia';
+      deposit.username = "Tidak tersedia";
     }
   }
 
-  const transactionKey = `${transactionId}_${amount}`;
-
   global.processedTransactions ??= new Set();
+  global.processingTransactions ??= new Set();
 
+  const transactionKey =
+    `${transactionId}_${amount}`;
+
+  // Transaksi yang sudah sukses tidak boleh dikreditkan lagi.
   if (global.processedTransactions.has(transactionKey)) {
-    logger.info(`Transaction ${transactionKey} already processed, skipping...`);
+    logger.info(
+      `[MATCH] Transaksi sudah diproses | ${transactionKey}`
+    );
     return false;
   }
 
-  // LOCK AGAR TIDAK DIPROSES DUA KALI
-  global.processedTransactions.add(transactionKey);
-  deposit.status = "processing";
+  // Cegah pemrosesan bersamaan di proses Node.js yang sama.
+  if (global.processingTransactions.has(transactionKey)) {
+    logger.info(
+      `[MATCH] Transaksi sedang diproses | ${transactionKey}`
+    );
+    return false;
+  }
+
+  global.processingTransactions.add(transactionKey);
+
+  let balanceUpdated = false;
 
   try {
+    deposit.status = "processing";
+
     logger.info(
-      `Update saldo untuk user ${deposit.userId}, amount: ${amount}`
+      `[MATCH] Memproses top up | user=${deposit.userId} | ` +
+      `saldoTambah=${amount} | totalBayar=${paidAmount} | ` +
+      `fee=${paidAmount - amount}`
     );
 
-    await updateUserBalance(deposit.userId, amount);
+    // ========================================================
+    // TAMBAH SALDO
+    // ========================================================
+
+    await updateUserBalance(
+      deposit.userId,
+      amount
+    );
+
+    balanceUpdated = true;
+
+    // Setelah saldo bertambah, jangan biarkan kegagalan
+    // notifikasi menyebabkan saldo dikreditkan ulang.
+    global.processedTransactions.add(transactionKey);
+
+    // ========================================================
+    // BONUS CONFIG
+    // ========================================================
 
     const config = await new Promise((resolve, reject) => {
       db.get(
-        'SELECT * FROM bonus_config WHERE id = 1',
+        "SELECT * FROM bonus_config WHERE id = 1",
         (err, row) => {
-          if (err) reject(err);
-          else resolve(row);
+          if (err) return reject(err);
+          resolve(row);
         }
       );
     });
 
     const now = Date.now();
 
-    if (config) {
-      if (
-        config.enabled &&
-        config.end_at > 0 &&
-        now > config.end_at
-      ) {
-        await new Promise((resolve) => {
-          db.run(
-            'UPDATE bonus_config SET enabled = 0 WHERE id = 1',
-            resolve
-          );
-        });
+    if (
+      config &&
+      config.enabled &&
+      config.end_at > 0 &&
+      now > config.end_at
+    ) {
+      await new Promise((resolve, reject) => {
+        db.run(
+          "UPDATE bonus_config SET enabled = 0 WHERE id = 1",
+          (err) => err ? reject(err) : resolve()
+        );
+      });
 
-        config.enabled = 0;
-      }
-
-      if (
-        config.enabled &&
-        config.start_at > 0 &&
-        now < config.start_at
-      ) {
-        config.enabled = 0;
-      }
+      config.enabled = 0;
     }
+
+    if (
+      config &&
+      config.enabled &&
+      config.start_at > 0 &&
+      now < config.start_at
+    ) {
+      config.enabled = 0;
+    }
+
+    // ========================================================
+    // BONUS
+    // ========================================================
 
     let bonus = 0;
     let bonusPercent = 0;
 
-    if (config?.enabled && amount >= config.min_topup) {
+    if (
+      config?.enabled &&
+      amount >= Number(config.min_topup)
+    ) {
       bonus = Math.floor(
-        amount * config.bonus_percent / 100
+        amount * Number(config.bonus_percent) / 100
       );
 
-      bonusPercent = config.bonus_percent;
+      bonusPercent = Number(config.bonus_percent);
 
       deposit.bonus = bonus;
       deposit.bonus_percent = bonusPercent;
@@ -13278,6 +14931,10 @@ async function processMatchingPayment(deposit, matchingTransaction, uniqueCode) 
       deposit.bonus_percent = 0;
     }
 
+    // ========================================================
+    // LOG TOP UP
+    // ========================================================
+
     await logTopup(
       deposit.userId,
       deposit.username,
@@ -13286,92 +14943,147 @@ async function processMatchingPayment(deposit, matchingTransaction, uniqueCode) 
     );
 
     logger.info(
-      `✅ Topup ${paymentMethod} berhasil dicatat | user=${deposit.userId} | nominal=${amount}`
+      `✅ Topup ${paymentMethod} berhasil dicatat | ` +
+      `user=${deposit.userId} | nominal=${amount}`
     );
+
+    // ========================================================
+    // SALDO TERBARU
+    // ========================================================
 
     const userBalance = await new Promise((resolve, reject) => {
       db.get(
-        'SELECT saldo FROM users WHERE user_id = ?',
+        "SELECT saldo FROM users WHERE user_id = ?",
         [deposit.userId],
         (err, row) => {
-          if (err) reject(err);
-          else resolve(row);
+          if (err) return reject(err);
+          resolve(row);
         }
       );
     });
 
     if (!userBalance) {
-      throw new Error('User balance not found after update');
-    }
-
-    logger.info(
-      '[PAKASIR NOTIF DATA] ' +
-      JSON.stringify({
-        amount,
-        bonus: deposit.bonus,
-        bonus_percent: deposit.bonus_percent,
-        saldo: userBalance.saldo
-      })
-    );
-
-    logger.info("[MATCH] masuk processMatchingPayment");
-
-    logger.info(
-      "[MATCH] sebelum send notif " +
-      JSON.stringify({
-        transaction_id: deposit.transaction_id,
-        amount,
-        userId: deposit.userId,
-        username: deposit.username
-      })
-    );
-
-    const notificationSent =
-      await sendPaymentSuccessNotificationByUserId(
-        deposit.userId,
-        {
-          transaction_id: deposit.transaction_id,
-          amount,
-          originalAmount: amount,
-          bonus: deposit.bonus || 0,
-          bonus_percent: deposit.bonus_percent || 0,
-          qrMessageId: deposit.qrMessageId,
-          method: deposit.method,
-          username: deposit.username
-        },
-        userBalance.saldo,
-        deposit.username
+      throw new Error(
+        "User balance not found after update"
       );
-
-    logger.info("[MATCH] notificationSent = " + notificationSent);
-
-    if (notificationSent) {
-      deposit.status = "success";
-      return true;
     }
 
-    deposit.status = "pending";
-    global.processedTransactions.delete(transactionKey);
+    // ========================================================
+    // NOTIFIKASI
+    // ========================================================
 
-    return false;
+    let notificationSent = false;
+
+    try {
+      notificationSent =
+        await sendPaymentSuccessNotificationByUserId(
+          deposit.userId,
+          {
+            transaction_id:
+              deposit.transaction_id || transactionId,
+
+            // Saldo yang masuk, tidak termasuk fee.
+            amount,
+            originalAmount: amount,
+
+            // Informasi pembayaran aktual.
+            paidAmount,
+            fee: paidAmount - amount,
+
+            bonus: deposit.bonus || 0,
+            bonus_percent: deposit.bonus_percent || 0,
+            qrMessageId: deposit.qrMessageId,
+            method: paymentMethod,
+            username: deposit.username
+          },
+          userBalance.saldo,
+          deposit.username
+        );
+    } catch (notificationError) {
+      logger.error(
+        `[MATCH] Notifikasi gagal | ${uniqueCode}: ` +
+        notificationError.message
+      );
+    }
+
+    logger.info(
+      `[MATCH] Hasil notifikasi | ${uniqueCode} | ` +
+      `sent=${notificationSent}`
+    );
+
+    // ========================================================
+    // SELESAI
+    // ========================================================
+
+    deposit.status = "success";
+
+    logger.info(
+      `✅ [MATCH] Top up selesai | ${uniqueCode} | ` +
+      `nominal=${amount} | bayar=${paidAmount} | ` +
+      `fee=${paidAmount - amount}`
+    );
+
+    // Pembayaran sudah masuk. Kegagalan notifikasi tidak
+    // boleh membuat deposit dikreditkan ulang.
+    return true;
 
   } catch (error) {
-    deposit.status = "pending";
-    global.processedTransactions.delete(transactionKey);
+    logger.error(
+      `[MATCH] Error memproses pembayaran | ${uniqueCode}:`,
+      error
+    );
 
-    logger.error('❌ Error processing payment:', error);
+    if (balanceUpdated) {
+      // Saldo sudah ditambah: jangan hapus penanda transaksi.
+      // Perlu pemeriksaan/rekonsiliasi jika proses lanjutan gagal.
+      global.processedTransactions.add(transactionKey);
+
+      deposit.status = "processing";
+
+      logger.error(
+        `[MATCH] Saldo sudah berubah, perlu rekonsiliasi | ${uniqueCode}`
+      );
+    } else {
+      deposit.status = "pending";
+    }
+
     return false;
+
+  } finally {
+    global.processingTransactions.delete(transactionKey);
   }
 }
 
+// ============================================================
+// CHECK QRIS OTOMATIS
+// ============================================================
+
 setInterval(async () => {
+
   try {
+
     await checkQRISStatus();
+
   } catch (err) {
-    logger.error("❌ Gagal cek status QRIS:", err.message);
+
+    logger.error(
+      "❌ Gagal cek status QRIS:",
+      err.message
+    );
+
   }
+
 }, 5000);
-setInterval(checkQRISStatusGopay, 15000); // cek tiap 15 detik
+
+
+// ============================================================
+// CHECK QRIS GOPAY
+// ============================================================
+
+setInterval(
+  checkQRISStatusGopay,
+  15000
+); // cek tiap 15 detik
 function resetUserSaldo(userId) {
   return new Promise((resolve, reject) => {
     db.run(
