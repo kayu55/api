@@ -2026,11 +2026,11 @@ bot.action('menu_cek_kuota', async (ctx) => {
 📱 <b>Masukkan nomor XL/AXIS</b>
 
 Contoh:
-<code>081234567890</code>
+<code>083851776897</code>
 
 atau
 
-<code>6281234567890</code>
+<code>6287721866542</code>
 
 ━━━━━━━━━━━━━━━━━━━━━
 ⚡ <i>Nomor akan otomatis diproses.</i>
@@ -3928,7 +3928,8 @@ async function sendMainMenu(ctx) {
 <a href="https://t.me/${adminUsername}">╰📨 @${adminUsername}</a>
 
 📦━━━━━━━━━━━━━━━━━━━━━📦
-     <code>🌐 ᴅɪᴋᴇʟᴏʟᴀ ᴏʟᴇʜ ${NAMA_STORE} ɴᴇᴛᴡᴏʀᴋ</code>
+     <code>  💥 ᵁᴾᴸᴼᴬᴰ ᴮʸ ᴬᴿʸᴬ ᴮᴸᴵᵀᴬᴿ </code>
+     <code>  📢 ᵂᴬ 081450330727 </code>
 📦━━━━━━━━━━━━━━━━━━━━━📦
 `;
 
@@ -4359,27 +4360,22 @@ case "ssh": {
 ├ 👤 ᴜꜱᴇʀɴᴀᴍᴇ : \`${sshData.username}\`
 ├ 🔑 ᴘᴀꜱꜱᴡᴏʀᴅ : \`${sshData.password}\`
 ├ 📅 ᴇxᴘɪʀᴇᴅ  : \`${sshData.expired || account.expired_at}\`
-├ 🌐 ɪᴘ ʟɪᴍɪᴛ : \`${sshData.ip_limit}\`
+├ 🌐 ɪᴘ ʟɪᴍɪᴛ : \`2 IP\`
 └ 🟢 ꜱᴛᴀᴛᴜꜱ   : \`${account.status.toUpperCase()}\`
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
 ┌〔 🌍 *ꜱᴇʀᴠᴇʀ* 〕
 ├ 🌐 ᴅᴏᴍᴀɪɴ      : \`${sshData.domain}\`
-├ ☁️ ᴄʟᴏᴜᴅꜰʀᴏɴᴛ  : \`${server.cloudfront || "-"}\`
-├ 🌍 ɴᴀᴍᴇꜱᴇʀᴠᴇʀ  : \`${sshData.ns_domain}\`
-└ 🔑 ᴘᴜʙ ᴋᴇʏ     : \`${sshData.pubkey}\`
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
 ┌〔 🔌 *ᴘᴏʀᴛ* 〕
-├ 🔐 ᴛʟꜱ        : \`443,8443\`
-├ 🌐 ʜᴛᴛᴘ       : \`80,8080,2086,8880\`
+├ 🔐 ᴛʟꜱ        : \`443,8443,2087,2096,2053,2083\`
+├ 🌐 ʜᴛᴛᴘ       : \`80,8080,8880,2082,2086,2052,2095\`
 ├ ⚡ ᴏᴘᴇɴꜱꜱʜ    : \`22\`
-├ 🚀 ᴜᴅᴘꜱꜱʜ      : \`1-65535\`
-├ 🌍 ᴅɴꜱ        : \`53,2222\`
-├ 📡 ᴅʀᴏᴘʙᴇᴀʀ   : \`109,110\`
-└ 🎮 ʙᴀᴅᴠᴘɴ      : \`7300\`
+├ 📡 ᴅʀᴏᴘʙᴇᴀʀ   : \`109,143\`
+└ 🎮 ʙᴀᴅᴠᴘɴ      : \`7100-7300\`
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
@@ -4391,13 +4387,11 @@ case "ssh": {
 
 📄 *ᴘᴀʏʟᴏᴀᴅ*
 
-\`GET /cdn-cgi/trace HTTP/1.1[crlf]Host: Bug_Kalian[crlf][crlf]GET-RAY / HTTP/1.1[crlf]Host: [host][crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]\`
+\`GET / HTTP/1.1[crlf]Host: [host_port][crlf]Upgrade: Websocket[crlf]Connection: Keep-Alive[crlf][crlf]\`
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-💾 *ꜱᴀᴠᴇ ᴀᴄᴄᴏᴜɴᴛ*
-
-https://${sshData.domain}:81/ssh-${sshData.username}.txt
+💥 *ᵁᴾᴸᴼᴬᴰ ᴮʸ ᴬᴿʸᴬ ᴮᴸᴵᵀᴬᴿ*
 `;
 
     return ctx.reply(msg, {
@@ -4428,18 +4422,17 @@ case "vmess": {
 ┌〔 📄 *ᴀᴄᴄᴏᴜɴᴛ ɪɴꜰᴏ* 〕
 ├ 👤 ᴜꜱᴇʀɴᴀᴍᴇ : \`${vmessData.username}\`
 ├ 🆔 ᴜᴜɪᴅ      : \`${vmessData.uuid}\`
-├ 📅 ᴇxᴘɪʀᴇᴅ   : \`${vmessData.expired || account.expired_at}\`
+├ 📅 ᴇxᴘɪʀᴇᴅ   : \`${vmessData.expired}\`
 ├ 📦 Qᴜᴏᴛᴀ     : \`${vmessData.quota === '0 GB' ? 'Unlimited' : vmessData.quota}\`
-├ 🌐 ɪᴘ ʟɪᴍɪᴛ  : \`${vmessData.ip_limit === '0' ? 'Unlimited' : vmessData.ip_limit} IP\`
-└ 🟢 ꜱᴛᴀᴛᴜꜱ    : \`${account.status.toUpperCase()}\`
+├ 🌐 ɪᴘ ʟɪᴍɪᴛ  : \`2 IP\`
+└ 🟢 ꜱᴛᴀᴛᴜꜱ    : \`ACTIVE\`
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
 ┌〔 🌍 *ꜱᴇʀᴠᴇʀ* 〕
 ├ 🌐 ᴅᴏᴍᴀɪɴ      : \`${vmessData.domain}\`
-├ ☁️ ᴄʟᴏᴜᴅꜰʀᴏɴᴛ  : \`${server.cloudfront || "-"}\`
-├ 🔐 ᴛʟꜱ ᴘᴏʀᴛ    : \`443,8443\`
-├ 🌍 ʜᴛᴛᴘ ᴘᴏʀᴛ   : \`80,8080,2086,8880\`
+├ 🔐 ᴛʟꜱ ᴘᴏʀᴛ    : \`443,8443,2087,2096,2053,2083\`
+├ 🌍 ʜᴛᴛᴘ ᴘᴏʀᴛ   : \`8080,8880,2082,2086,2052,2095\`
 ├ 🔒 ꜱᴇᴄᴜʀɪᴛʏ    : \`Auto\`
 ├ 📂 ᴘᴀᴛʜ        : \`/vmess\`
 └ 🚀 ɢʀᴘᴄ ᴘᴀᴛʜ   : \`vmess-grpc\`
@@ -4470,9 +4463,7 @@ ${vmessData.vmess_grpc_link}
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-💾 *ꜱᴀᴠᴇ ᴀᴄᴄᴏᴜɴᴛ*
-
-https://${vmessData.domain}:81/vmess-${vmessData.username}.txt
+💥 *ᵁᴾᴸᴼᴬᴰ ᴮʸ ᴬᴿʸᴬ ᴮᴸᴵᵀᴬᴿ*
 `;
 
     return ctx.reply(msg, {
@@ -4675,8 +4666,6 @@ bot.action('menu_trial', async (ctx) => {
 ⚡ <b>Daftar Trial:</b>
 • SSH
 • VMESS
-• VLESS
-• TROJAN
 `;
 
 const keyboard = [
@@ -4689,25 +4678,6 @@ const keyboard = [
     {
       text: '⚡ VMESS Trial',
       callback_data: 'trial_vmess',
-      style: 'primary'
-    }
-  ],
-  [
-    {
-      text: '🛡️ VLESS Trial',
-      callback_data: 'trial_vless',
-      style: 'primary'
-    },
-    {
-      text: '🔥 TROJAN Trial',
-      callback_data: 'trial_trojan',
-      style: 'primary'
-    }
-  ],
-  [
-    {
-      text: '🌙 SHADOWSOCKS Trial',
-      callback_data: 'trial_shadowsocks',
       style: 'primary'
     }
   ],
@@ -4754,8 +4724,6 @@ bot.action('menu_create', async (ctx) => {
 🚀 <b>Tersedia:</b>
 • SSH
 • VMESS
-• VLESS
-• TROJAN
 `;
 
 const keyboard = [
@@ -4768,25 +4736,6 @@ const keyboard = [
     {
       text: '⚡ VMESS',
       callback_data: 'create_vmess',
-      style: 'primary'
-    }
-  ],
-  [
-    {
-      text: '🛡️ VLESS',
-      callback_data: 'create_vless',
-      style: 'primary'
-    },
-    {
-      text: '🔥 TROJAN',
-      callback_data: 'create_trojan',
-      style: 'primary'
-    }
-  ],
-  [
-    {
-      text: '🌙 SHADOWSOCKS',
-      callback_data: 'create_shadowsocks',
       style: 'primary'
     }
   ],
@@ -4833,8 +4782,6 @@ bot.action('menu_renew', async (ctx) => {
 🔄 <b>Tersedia:</b>
 • SSH
 • VMESS
-• VLESS
-• TROJAN
 `;
 
 const keyboard = [
@@ -4847,25 +4794,6 @@ const keyboard = [
     {
       text: '⚡ VMESS',
       callback_data: 'renew_vmess',
-      style: 'primary'
-    }
-  ],
-  [
-    {
-      text: '🛡️ VLESS',
-      callback_data: 'renew_vless',
-      style: 'primary'
-    },
-    {
-      text: '🔥 TROJAN',
-      callback_data: 'renew_trojan',
-      style: 'primary'
-    }
-  ],
-  [
-    {
-      text: '🌙 SHADOWSOCKS',
-      callback_data: 'renew_shadowsocks',
       style: 'primary'
     }
   ],
@@ -5915,7 +5843,7 @@ bot.on('text', async (ctx, next) => {
         '❌ <b>Nomor tidak valid.</b>\n\n' +
         'Silakan masukkan nomor XL/AXIS yang benar.\n\n' +
         'Contoh:\n' +
-        '<code>087812345678</code>',
+        '<code>083812385678</code>',
         {
           parse_mode: 'HTML'
         }
@@ -6948,9 +6876,10 @@ keyboard.push([
 ☎️ <b>ʜᴜʙᴜɴɢɪ ᴀᴅᴍɪɴ:</b>
 ╰<a href="https://t.me/${adminUsername}">@${adminUsername}</a>
 
-📦━━━━━━━━━━━━━━━━━━━━📦
-     <code>🌐 ᴅɪᴋᴇʟᴏʟᴀ ᴏʟᴇʜ ${namaStore} ɴᴇᴛᴡᴏʀᴋ</code>
-📦━━━━━━━━━━━━━━━━━━━━📦
+📦━━━━━━━━━━━━━━━━━━━━━📦
+     <code>  💥 ᵁᴾᴸᴼᴬᴰ ᴮʸ ᴬᴿʸᴬ ᴮᴸᴵᵀᴬᴿ </code>
+     <code>  📢 ᵂᴬ 081450330727 </code>
+📦━━━━━━━━━━━━━━━━━━━━━📦
 `;
 
     let sentMessage;
@@ -12537,7 +12466,7 @@ async function processDepositGopay(ctx, amount) {
       `🔗 [Buka QRIS](${safeQrUrl})`,
       ``,
       `┏━━━━━━━━━━━━━━━━━━━━━┓`,
-      `    🌐 ᴅɪᴋᴇʟᴏʟᴀ ᴏʟᴇʜ *ᴀɴꜱᴇɴᴅᴀɴᴛ ɴᴇᴛᴡᴏʀᴋ*`,
+      `          💥 ᵁᴾᴸᴼᴬᴰ ᴮʸ ᴬᴿʸᴬ ᴮᴸᴵᵀᴬᴿ`,
       `┗━━━━━━━━━━━━━━━━━━━━━┛`
     ].join('\n');
 
