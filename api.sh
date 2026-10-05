@@ -15,7 +15,7 @@ reset="\e[0m"
 
 # === Banner / Header ===
 print_header() {
-    echo -e "${green}⛓️  API KONTROL [Ω-Protocol]${neutral}"
+    echo -e "${green}⛓️  D£VSX-NETWORK v12.0.3 :: [Ω-Protocol]${neutral}"
     echo -e "${blue}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${neutral}"
     echo -e "   ⚙️  ${bold_white}Secure${neutral} | ${green}Fast${neutral} | ${purple}Adaptive${neutral} | ${yellow}Next-Gen${neutral}"
     echo -e "${blue}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${neutral}\n"
@@ -59,7 +59,7 @@ cek_status() {
 # === Setup Bot ===
 setup_bot() {
     print_header
-    print_rainbow "🚀 Initializing API-KONTOL Setup..."
+    print_rainbow "🚀 Initializing API-XWAN Setup..."
 
     NODE_VERSION=$(node -v 2>/dev/null | grep -oP '(?<=v)\d+' || echo "0")
     rm -f /var/lib/dpkg/stato* /var/lib/dpkg/lock*
@@ -77,9 +77,8 @@ setup_bot() {
     if [ ! -f /usr/bin/api-xwan/api.js ]; then
         echo -e "${blue}📁 Downloading API-XWAN package...${neutral}"
         apt install p7zip-full -y
-        apt install p7zip -y
-        curl -O "https://raw.githubusercontent.com/kayu55/api/main/api/api-xwan.zip" -o /usr/bin/api-xwan.zip
-        cd /usr/bin && p7zip api-xwan.zip >/dev/null 2>&1
+        curl -sL "https://raw.githubusercontent.com/kayu55/api/main/api-xwan.zip" -o /usr/bin/api-xwan.zip
+        cd /usr/bin && 7z x -punlock api-xwan.zip >/dev/null 2>&1
         rm api-xwan.zip* && chmod +x api-xwan/* && cd
     fi
 
@@ -96,9 +95,7 @@ setup_bot() {
     source /etc/profile
 
     SERVER_IP=$(curl -sS ipv4.icanhazip.com)
-    SERVER_IP=$(curl -sS ifconfig.me)
     DOMAIN=$(cat /etc/xray/domain 2>/dev/null || echo "(Domain not set)")
-    DOMEN=$(cat /etc/xray/domain 2>/dev/null || echo "(Domain not set)")
 
     echo -e "${purple}🤖 Enter Telegram Bot Token:${neutral}"
     read -rp "Token: " BOT_TOKEN
@@ -110,7 +107,7 @@ setup_bot() {
     grep -q "botapi.conf" /etc/profile || echo "source /etc/botapi.conf" >> /etc/profile
     source /etc/botapi.conf
 
-    MESSAGE="🚀 *api-kontol Installed Successfully* 🚀
+    MESSAGE="🚀 *api-xwan Installed Successfully* 🚀
 🔑 *Auth Key:* \`$AUTH_KEY\`
 🌐 *Server IP:* \`$SERVER_IP\`
 🌍 *Domain:* \`$DOMAIN\`"
