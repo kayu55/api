@@ -168,7 +168,6 @@ server_app() {
   "GAMBAR_TOPUP": "$gambar_topup",
   "PAKASIR_API_KEY": "$API_SIR",
   "PAKASIR_PROJECT": "$PRJ"
-  "PAYMENT": "SHOPEEPAY",
 }
 EOF
 
