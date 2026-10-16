@@ -161,7 +161,7 @@ server_app() {
   "GOPAY_ID": "$gopay_id",
   "GOPAY_KEY": "$gopay_key",
   "DATA_QRIS_GOPAY": "$dataqrisgopay",
-  "AUTH_PAYMET_GETWAY": "SHOPEEPAY",
+  "AUTH_PAYMET_GETWAY": "9360091830052619623",
   "GROUP_USERNAME": "$username_grup",
   "CHANNEL_USERNAME": "$username_channel",
   "GAMBAR_MENU": "$gambar_menu",
